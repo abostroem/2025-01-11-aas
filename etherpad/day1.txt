@@ -1,0 +1,207 @@
+Welcome to The Carpentries Etherpad!
+
+This pad is synchronized as you type, so that everyone viewing this page sees the same text. This allows you to collaborate seamlessly on documents.
+ 
+Use of this service is restricted to members of The Carpentries community; this is not for general purpose use (for that, try https://etherpad.wikimedia.org).
+
+Users are expected to follow our code of conduct: https://docs.carpentries.org/topic_folders/policies/code-of-conduct.html
+
+All content is publicly available under the Creative Commons Attribution License: https://creativecommons.org/licenses/by/4.0/
+
+ ----------------------------------------------------------------------------
+ Live Updates:
+ 9:00am - Introductions 
+	* Link to Lesson Sections: https://datacarpentry.github.io/astronomy-python/instructor/index.html
+	* Wifi: Winter245   Password: AAS245Winter
+	* We will recreate the GD-1 plots from this paper: https://arxiv.org/abs/1805.00425
+
+
+Workaround for gala:
+Download those two files and put them alongside your jupyter notebook in the same directory:
+https://raw.githubusercontent.com/adrn/gala/refs/heads/main/gala/coordinates/gd1.py
+https://raw.githubusercontent.com/adrn/gala/refs/heads/main/gala/coordinates/reflex.py
+ 
+Then, in your jupyter notebook, instead of importing directly from gala, import as follows
+from gala.coordinates import GD1Koposov10 --> from gd1 import GD1Koposov10
+from gala.coordinates import reflex_correct --> from reflex import reflex_correct
+ 
+All the rest of the code remains the same
+
+
+
+-----------------------------------------------------SECTION 1---------------------------------------------------------------------
+9:17am - Basic Queries -Connecting to Gaia
+	* Open in your Terminal:
+             conda activate AstronomicalData
+             jupyter notebook
+	* To run a jupyter cell,  hit shift+enter
+	* To set up Gaia: 
+            from astroquery.gaia import Gaia
+            tables = Gaia.load_tables(only_names=True)
+	* If you couldn't see the number of columns you can do:
+          columns = table_metadata.columns
+          len(columns)
+
+9:53am - Basic Queries - Writing Queries
+	* Question: What's the difference between "FROM" and "WHERE"
+	* Answer: 
+          SELECT - What columns you want
+          FROM - What spreadsheet
+         WHERE - Specific criteria from spreadsheet
+	* If table is missing data, include WHERE statement
+         string: WHERE parallax < 1
+	* Question: Since results can change each time when running "WHERE Parallax < 1" how to get back the same results everytime? 
+	* Answer: If you ask for 2700 results, you always get the same 2700 data points, but you might recieve it in a different order. You can however, sort them
+	* SQL query order matters. If "WHERE" statement is in the wrong place you will receive an HTTP Error
+	* Question: Does indentation matter for the WHERE statement?
+            query2_sol1 = """
+            SELECT TOP 10 
+            source_id, ref_epoch, ra, dec, parallax 
+            FROM gaiadr2.gaia_source
+            WHERE parallax < 1   
+                  AND bp_rp > -0.75 AND bp_rp < 2
+        """
+	* Answer: No, its just visually appealing 
+	* Astro Queries keep track of the data and may be more useful than a basic query 
+	* Question: How do you keep track of which name is which? i.e.
+          query3 = query3_base.format(columns=columns)    vs
+          query3 = query3_base.format(columns=columns_i_want)
+	* Answer: It's common practice to use keyword = variable and they are usually the same name  
+
+
+
+10:37am - Break
+
+
+
+
+------------------------------------------------SECTION 2------------------------------------------------------------
+11:19am - Coordinate Transformations -  Selecting a Region
+	* Question: Is there a way to search for units to make sure it is in the correct spelling?
+	* Answer: "dir" is the best way to check this , or you can type "u." then hit tab and it will give you the list
+	* Select a region that is defined within a specific circle. If point is inside the circle it will give back a 1, if outside of the circle, it will give back a 0:
+*    cone_query = """
+        SELECT TOP 10 source_id 
+        FROM gaiadr2.gaia_source 
+        WHERE 1=CONTAINS(  
+              POINT(ra, dec),  
+              CIRCLE(88.8, 7.4, 0.08333333))
+     """
+	* Question: What are "l" and "b" in galactic coordinates?
+	* Answer: Galactic longitude (l) is measured with primary direction from the Sun to the center of the galaxy in the galactic plane, while the galactic latitude (b) measures the angle of the object above the galactic plane
+
+
+12:08pm - Lunch 
+
+
+
+1:10pm - Coordinate Transformations - Selecting a Rectangle
+	* Need 4 points for each corner of the rectangle (x1, x2, y1, y2)
+	* Note the code line corners_icrs = corners.transform_to('icrs')  isnt necessairly a rectangle, it's some sort of polygon that we can feed to our query in ICRS coordinates
+	* To translate into something ADQL can understand it must be a single string. POLYGON is an ADQL command
+            POLYGON(X, Y
+                              X, Y
+                              X, Y)
+	* To do that, use:
+           def skycoord_to_string(skycoord):
+*    """Convert a 1D list of SkyCoord to string for Gaia's query format."""    
+                    corners_list_str = skycoord.to_string()    
+                    corners_single_str = ' '.join(corners_list_str)    
+                    return corners_single_str.replace(' ', ', ')
+	* Assembling a GD-1 Query
+		*  pmra - proper motion right ascension
+		* pmdec - proper motion declination
+	* Results will automatically truncate at 2000 data points
+	* Recall: Asynchronous query made for large queries that take long time. It stores the answers for a couple days
+	* Check Point: Reached a milestone - We've completed our query and now we have data we will be searching in GD-1. You should save this data.
+		* How to save:
+			filename = 'gd1_results.fits' 
+			polygon_results.write(filename, overwrite=True)      
+		* Verify it saved:
+			from os.path import 
+			getsizeMB = 1024 * 1024
+			getsize(filename) / MB
+	* Question: How to add a cell above the one you're working in with jupyter notebook?
+	* Answer: In your current cell, to the right, select the symbol that shows a "+" sign over a rectangle
+
+
+
+
+
+--------------------------------------------------------SECTION 3-----------------------------------------------------------------
+2:00pm - Plotting & Tabular Data - Scatter Plots
+	* To have plots show in your notebook use:
+		%matplotlib inline
+	* In "plt.plot(x, y, 'ko')"  k is for black, and o means circle-shaped markers
+	* alpha is oppacity, markersize is is the size of the plot points 
+	* I.e. x = polygon_results['ra']
+          y = polygon_results['dec']
+          plt.plot(x, y, 'ko', markersize=0.1, alpha=0.1)
+          plt.xlabel('ra (degree ICRS)')
+          plt.ylabel('dec (degree ICRS)')
+          
+	* If you want to get funky with it:
+		plt.plot(x, y, 'ko-', markersize=6, markerfacecolor='cyan', markeredgewidth=1, markeredgecolor='black', 
+		linewidth=1.5, alpha=0.8)
+		
+		plt.xlabel('RA (Degrees, ICRS)', fontsize=12, labelpad=10, color='darkblue')
+		plt.ylabel('Dec (Degrees, ICRS)', fontsize=12, labelpad=10, color='darkblue')
+		plt.grid(True)
+		
+	* Question: Why choose 8kpc?
+	* Answer: Paper probably mentions this detail, also, because GD-1 is close to us, parallax might not be a reliable method to measure distance, so 8kpc is our best known distance 
+
+
+---------------------------------------------------------SECTION 4----------------------------------------------------------------
+2:30pm - Plotting & Tabular Data - Pandas DataFrame
+	* Pandas does everything Astropy does, but it does not have any units 
+	* Pandas calls a table a dataframe
+	* "results_df.head()" is equivalent as printing off the top 10 results with an SQL query 
+	* Pandas cannot directly write to a FITS file, but you can use Astropy
+		* Its also difficult to add something to a FITS file after its written and saved (not very flexible) 
+		* Can instead use an HDF (Hierarchical Data Format) file format to store large datasets 
+	* How to save hdf file:
+        filename = 'gd1_data.hdf'
+        results_df.to_hdf(filename, 'results_df', mode='w')
+	* " .to_hdf" tells pandas it has to write the data to an hdf file 
+	* Questions: hdf vs hdf5?
+	* Answer: hdf5 is a more modern version but both are used 
+	* Question: Any benefits to FITS files over the others?
+	* Answer: A loft of software people know how to use them, and it was standard for a while, HDF was adopted because the format is similar but easier to use
+	* How to check where file was saved? Type:
+           !pwd
+
+			
+3:00pm - Break 
+
+
+3:30 - Plotting & Tabular Data - Pandas DataFrame Contin...
+	* Notice that parallax in the table is negative. The larger numbers could be source confusion, and scattering can be both positive and negative (but don't worry about that for this workshop).
+	* If points are hard to see on a plot, we can "zoom in"
+	* Columns in pandas are called series 
+	* Bitwise Operators:
+		* & = and
+		* | = or
+		* ~ = not
+	* Tip: Perodically check on your data. Look at the type or the length of an array
+			len(data)
+			type(data)
+	* Now that we've zoomed in, we can see the tidal stream in the plot!
+		x = selected_df['phi1']
+		y = selected_df['phi2']
+		plt.plot(x, y, 'ko', markersize=1, alpha=1)
+		
+		plt.xlabel('phi1 (degree GD1)')
+		plt.ylabel('phi2 (degree GD1)')
+	* This code says open everything in this file, but the "with" statement will automatically close it for you 
+			with pd.HDFStore(filename) as hdf:
+			    print(hdf.keys())
+	* To add a line of code to the file use:
+       centerline_df.to_hdf(filename, 'centerline_df')
+	* To know it worked you should see:
+         ['/centerline_df', '/selected_df']
+	* Question: How to save notebook?
+	* Answer: Jupyter is good at autosaving, you can also save by going under "file", or selecting ctrl+s
+	* To exit terminal enter ctrl+c 
+
+
